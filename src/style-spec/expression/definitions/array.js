@@ -27,10 +27,12 @@ const types = {
 class ArrayAssertion implements Expression {
     type: ArrayType;
     input: Expression;
+    _inferred: boolean;
 
-    constructor(type: ArrayType, input: Expression) {
+    constructor(type: ArrayType, input: Expression, inferred: boolean = false) {
         this.type = type;
         this.input = input;
+        this._inferred = inferred;
     }
 
     static parse(args: Array<mixed>, context: ParsingContext): ?Expression {

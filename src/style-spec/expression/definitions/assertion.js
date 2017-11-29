@@ -29,9 +29,12 @@ class Assertion implements Expression {
     type: Type;
     args: Array<Expression>;
 
-    constructor(type: Type, args: Array<Expression>) {
+    _inferred: boolean;
+
+    constructor(type: Type, args: Array<Expression>, inferred: boolean = false) {
         this.type = type;
         this.args = args;
+        this._inferred = inferred;
     }
 
     static parse(args: Array<mixed>, context: ParsingContext): ?Expression {

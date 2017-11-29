@@ -68,26 +68,10 @@ class ParsingContext {
             if (Expr) {
                 let parsed = Expr.parse(expr, context);
                 if (!parsed) return null;
-                const expected = context.expectedType;
-                const actual = parsed.type;
-                if (expected) {
-                    // When we expect a number, string, or boolean but have a
-                    // Value, wrap it in a refining assertion, and when we expect
-                    // a Color but have a String or Value, wrap it in "to-color"
-                    // coercion.
-                    const canAssert = expected.kind === 'string' ||
-                        expected.kind === 'number' ||
-                        expected.kind === 'boolean';
+                parsed = context.annotateType(context.expectedType, parsed);
 
-                    if (canAssert && actual.kind === 'value') {
-                        parsed = new Assertion(expected, [parsed]);
-                    } else if (expected.kind === 'array' && actual.kind === 'value') {
-                        parsed = new ArrayAssertion(expected, parsed);
-                    } else if (expected.kind === 'color' && (actual.kind === 'value' || actual.kind === 'string')) {
-                        parsed = new Coercion(expected, [parsed]);
-                    }
-
-                    if (context.checkSubtype(expected, parsed.type)) {
+                if (context.expectedType) {
+                    if (context.checkSubtype(context.expectedType, parsed.type)) {
                         return null;
                     }
                 }
@@ -116,6 +100,37 @@ class ParsingContext {
         } else {
             return context.error(`Expected an array, but found ${typeof expr} instead.`);
         }
+    }
+
+
+    /**
+     * Wrap the given expression in a type assertion if necessary.
+     * @private
+     */
+    annotateType(expected: ?Type, expression: Expression) {
+        if (!expected) {
+            return expression;
+        }
+
+        const actual = expression.type;
+
+        // When we expect a number, string, or boolean but have a
+        // Value, wrap it in a refining assertion, and when we expect
+        // a Color but have a String or Value, wrap it in "to-color"
+        // coercion.
+        const canAssert = expected.kind === 'string' ||
+            expected.kind === 'number' ||
+            expected.kind === 'boolean';
+
+        if (canAssert && actual.kind === 'value') {
+            return new Assertion(expected, [expression], true);
+        } else if (expected.kind === 'array' && actual.kind === 'value') {
+            return new ArrayAssertion(expected, expression, true);
+        } else if (expected.kind === 'color' && (actual.kind === 'value' || actual.kind === 'string')) {
+            return new Coercion(expected, [expression], true);
+        }
+
+        return expression;
     }
 
     /**

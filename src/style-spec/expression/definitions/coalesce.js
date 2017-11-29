@@ -1,6 +1,10 @@
 // @flow
 
 const assert = require('assert');
+const Assertion = require('./assertion');
+const ArrayAssertion = require('./array');
+const Coercion = require('./coercion');
+const {ValueType} = require('../types');
 
 import type { Expression } from '../expression';
 import type ParsingContext from '../parsing_context';
@@ -25,14 +29,32 @@ class Coalesce implements Expression {
             outputType = context.expectedType;
         }
         const parsedArgs = [];
+
+        let needsOuterAnnotation = false;
+
         for (const arg of args.slice(1)) {
-            const parsed = context.parse(arg, 1 + parsedArgs.length, outputType);
+            let parsed = context.parse(arg, 1 + parsedArgs.length, outputType);
             if (!parsed) return null;
             outputType = outputType || parsed.type;
+
+            // strip off any inferred type assertions so that they don't
+            // produce a runtime error for `null` input, which would preempt
+            // the desired null-coalescing behavior
+            if ((parsed instanceof Assertion || parsed instanceof Coercion) &&
+                parsed._inferred) {
+                needsOuterAnnotation = true;
+                parsed = parsed.args[0];
+            } else if (parsed instanceof ArrayAssertion && parsed._inferred) {
+                needsOuterAnnotation = true;
+                parsed = parsed.input;
+            }
+
             parsedArgs.push(parsed);
         }
         assert(outputType);
-        return new Coalesce((outputType: any), parsedArgs);
+        return needsOuterAnnotation ?
+            context.annotateType(outputType, new Coalesce(ValueType, parsedArgs)) :
+            new Coalesce((outputType: any), parsedArgs);
     }
 
     evaluate(ctx: EvaluationContext) {
